@@ -30,6 +30,9 @@ class Integer(BaseNode):
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"pushint {self.value}")
 
+    def visit(self, visitor):
+        return visitor.visit_integer(self)
+
     def _tealish(self) -> str:
         return f"{self.value}"
 
@@ -42,6 +45,9 @@ class Bytes(BaseNode):
 
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f'pushbytes "{self.value}"')
+
+    def visit(self, visitor):
+        return visitor.visit_bytes(self)
 
     def _tealish(self) -> str:
         return f'"{self.value}"'
@@ -62,6 +68,9 @@ class Variable(BaseNode):
 
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"load {self.var.scratch_slot} // {self.name}")
+
+    def visit(self, visitor):
+        return visitor.visit_variable(self)
 
     def _tealish(self) -> str:
         return f"{self.name}"
@@ -129,6 +138,9 @@ class Enum(BaseNode):
         elif isinstance(self.type, BytesType):
             writer.write(self, f"pushbytes {self.name}")
 
+    def visit(self, visitor):
+        return visitor.visit_enum(self)
+
     def _tealish(self) -> str:
         return f"{self.name}"
 
@@ -175,6 +187,9 @@ class BinaryOp(BaseNode):
         writer.write(self, self.a)
         writer.write(self, self.b)
         writer.write(self, f"{self.op}")
+
+    def visit(self, visitor):
+        return visitor.visit_binop(self, self.a, self.b)
 
     def _tealish(self) -> str:
         return f"{self.a.tealish()} {self.op} {self.b.tealish()}"
@@ -226,6 +241,9 @@ class FunctionCall(BaseNode):
 
     def write_teal(self, writer: "TealWriter") -> None:
         self.func_call.write_teal(writer)
+
+    def visit(self, visitor):
+        return self.func_call.visit(visitor)
 
     def _tealish(self) -> str:
         return self.func_call._tealish()
@@ -316,6 +334,9 @@ class OpCall(BaseNode):
         else:
             writer.write(self, f"{self.name}")
 
+    def visit(self, visitor):
+        return visitor.visit_op_call(self, self.args)
+
     def _tealish(self) -> str:
         args = [a.tealish() for a in self.args]
         if self.immediate_args:
@@ -384,6 +405,9 @@ class TxnField(BaseNode):
 
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"txn {self.field}")
+
+    def visit(self, visitor):
+        return visitor.visit_txn_field(self)
 
     def _tealish(self) -> str:
         return f"Txn.{self.field}"
@@ -542,6 +566,9 @@ class GlobalField(BaseNode):
 
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"global {self.field}")
+
+    def visit(self, visitor):
+        return visitor.visit_global_field(self)
 
     def _tealish(self) -> str:
         return f"Global.{self.field}"

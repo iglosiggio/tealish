@@ -28,6 +28,9 @@ def check_arg_types(name: str, incoming_args: List["Node"]) -> None:
 class BaseNode:
     _teal: List[str]
 
+    def visit(self, visitor) -> None:
+        raise NotImplementedError(self)
+
     def process(self) -> None:
         pass
 

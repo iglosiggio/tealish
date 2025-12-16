@@ -321,6 +321,12 @@ class Program(Node):
             )
             self.compiler.max_slot = max(self.compiler.max_slot, var.scratch_slot)
 
+    def visit(self, visitor) -> None:
+        if self.compiler.use_inner_txns_macro:
+            raise NotImplementedError
+
+        return visitor.visit_program(self, self.nodes)
+
     def write_teal(self, writer: "TealWriter") -> None:
         for n in self.child_nodes:
             n.write_teal(writer)
@@ -418,6 +424,9 @@ class TealVersion(LineStatement):
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"#pragma version {self.version}")
 
+    def visit(self, visitor):
+        return visitor.visit_version(self)
+
     def _tealish(self) -> str:
         return f"#pragma version {self.version}\n"
 
@@ -432,10 +441,16 @@ class Comment(LineStatement):
     def _tealish(self) -> str:
         return f"#{self.comment}\n"
 
+    def visit(self, visitor):
+        return visitor.visit_comment(self)
+
 
 class Blank(LineStatement):
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, "")
+
+    def visit(self, visitor):
+        return visitor.visit_blank(self)
 
     def _tealish(self) -> str:
         return "\n"
@@ -500,6 +515,9 @@ class Exit(LineStatement):
         writer.write(self, self.expression)
         writer.write(self, "return")
 
+    def visit(self, visitor):
+        return visitor.visit_exit(self, self.expression)
+
     def _tealish(self) -> str:
         return f"exit({self.expression.tealish()})\n"
 
@@ -521,6 +539,9 @@ class FunctionCallStatement(LineStatement):
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"// tl:{self.line_no}: {self.line}")
         writer.write(self, self.expression)
+
+    def visit(self, visitor):
+        return self.expression.visit(visitor)
 
     def _tealish(self) -> str:
         return f"{self.expression.tealish()}\n"
@@ -552,6 +573,9 @@ class Assert(LineStatement):
             writer.write(self, f"assert // {self.message}")
         else:
             writer.write(self, "assert")
+
+    def visit(self, visitor):
+        return visitor.visit_assert(self, self.arg)
 
     def _tealish(self) -> str:
         m = f', "{self.message}"' if self.message else ""
@@ -585,6 +609,9 @@ class VarDeclaration(LineStatement):
         if self.expression:
             writer.write(self, self.expression)
             writer.write(self, f"store {self.var.scratch_slot} // {self.name.value}")
+
+    def visit(self, visitor):
+        return visitor.visit_var_declaration(self, self.expression)
 
     def _tealish(self) -> str:
         s = f"{self.type_name} {self.name.tealish()}"
@@ -641,6 +668,9 @@ class Assignment(LineStatement):
                 writer.write(self, "pop // discarding value for _")
             else:
                 writer.write(self, f"store {name.slot} // {name.value}")
+
+    def visit(self, visitor):
+        return visitor.visit_assignment(self, self.expression)
 
     def _tealish(self) -> str:
         return (
@@ -971,6 +1001,9 @@ class InnerTxnFieldSetter(InlineStatement):
         writer.write(self, self.expression)
         writer.write(self, f"itxn_field {self.field_name}")
 
+    def visit(self, visitor):
+        return visitor.visit_inner_txn_field_setter(self, self.expression)
+
     def _tealish(self) -> str:
         array_index = f"[{self.index}]" if self.index is not None else ""
         output = f"{self.field_name}{array_index}: {self.expression.tealish()}"
@@ -1062,6 +1095,11 @@ class InnerTxn(InlineStatement):
             writer.write(self, "itxn_submit")
             writer.write(self, "// end inner_txn")
 
+    def visit(self, visitor):
+        if self.compiler.use_inner_txns_macro:
+            raise NotImplementedError
+        return visitor.visit_inner_txn(self, self.child_nodes)
+
     def _tealish(self) -> str:
         output = "inner_txn:\n"
         for n in self.child_nodes:
@@ -1142,6 +1180,9 @@ class IfThen(Node):
             n.write_teal(writer)
         writer.level -= 1
 
+    def visit(self, visitor):
+        return visitor.visit_if_then(self, self.child_nodes)
+
     def _tealish(self) -> str:
         output = ""
         for n in self.child_nodes:
@@ -1186,6 +1227,9 @@ class Elif(Node):
         for n in self.child_nodes:
             n.write_teal(writer)
         writer.level -= 1
+
+    def visit(self, visitor):
+        return visitor.visit_elif(self, self.condition, self.child_nodes)
 
     def _tealish(self) -> str:
         output = f"elif {'not ' if self.modifier else ''}{self.condition.tealish()}:\n"
@@ -1338,6 +1382,9 @@ class IfStatement(InlineStatement):
 
         if self.else_ is not None:
             self.else_.process()
+
+    def visit(self, visitor):
+        return visitor.visit_if(self, self.condition, self.if_then, self.elifs, self.else_)
 
     def write_teal(self, writer: "TealWriter") -> None:
         writer.write(self, f"// tl:{self.line_no}: {self.line}")
