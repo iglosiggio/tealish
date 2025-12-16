@@ -185,7 +185,13 @@ class TealishCompiler:
         from puya.options import PuyaOptions
         from pathlib import Path
 
-        options = PuyaOptions(optimization_level=2)
+        options = PuyaOptions(output_teal=True,
+                              output_ssa_ir=True,
+                              output_optimization_ir=True,
+                              output_destructured_ir=True,
+                              output_memory_ir=True,
+                              output_teal_intermediates=True,
+                              optimization_level=2)
         compilation_set = { contract_ref: Path(".") }
         sources_by_path = { Path("."): None }
 
@@ -194,7 +200,6 @@ class TealishCompiler:
                 log_ctx, options, compilation_set, sources_by_path, self.awsts
             )
             log_ctx.exit_if_errors()
-            print(teal[0].approval_program.teal_src)
 
 nowhere = SourceLocation(file=None, line=1)
 contract_ref = ContractReference("test")
@@ -229,7 +234,7 @@ class CompilerVisitor:
             raise NotImplementedError
         awst_else = self.accept(else_) if if_.else_ is not None else None
         for elif_ in reversed(elifs):
-            awst_else = IfElse(nowhere, self.accept(elif_.condition), Block(nowhere, body=self.accept_nodes(elif_.child_nodes)), awst_else)
+            awst_else = Block(nowhere, body=[IfElse(nowhere, self.accept(elif_.condition), Block(nowhere, body=self.accept_nodes(elif_.child_nodes)), awst_else)])
         return IfElse(nowhere, self.accept(condition), self.accept(then), awst_else)
 
     def visit_binop(self, binop, a, b):
